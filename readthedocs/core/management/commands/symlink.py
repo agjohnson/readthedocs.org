@@ -21,8 +21,8 @@ class Command(BaseCommand):
                     try:
                         log.info("Got slug from redis: %s" % slug)
                         utils.symlink(project=slug)
-                    except Exception, e:
-                        print e
+                    except Exception as e:
+                        print(e)
             else:
                 for slug in args:
                     utils.symlink(project=slug)

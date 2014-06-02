@@ -1,11 +1,12 @@
 import logging
-from haystack.forms import SearchForm
-from haystack.query import SearchQuerySet
 
 from django import forms
 from django.forms.fields import CharField
 from django.utils.translation import ugettext_lazy as _
-from models import UserProfile
+from haystack.forms import SearchForm
+from haystack.query import SearchQuerySet
+
+from .models import UserProfile
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class FacetedSearchForm(SearchForm):
             if not value:  # Ignore empty values
                 continue
             value = clean(value)
-            cleaned_facets.append(u'%s:"%s"' % (field, value))
+            cleaned_facets.append('%s:"%s"' % (field, value))
         return cleaned_facets
 
     def search(self):

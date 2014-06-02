@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import settings.sqlite
 from django.core.management import execute_manager

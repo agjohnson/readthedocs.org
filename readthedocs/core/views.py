@@ -73,7 +73,7 @@ def queue_info(request):
                 active_pks.append(str(kwargs['pk']))
             active_resp = "Active: %s  " % " ".join(active_pks)
             resp += active_resp
-        except Exception, e:
+        except Exception as e:
             resp += str(e)
 
     reserved = i.reserved()
@@ -84,9 +84,9 @@ def queue_info(request):
                 reserved_pks.append(str(kwargs['pk']))
             reserved_resp = " | Reserved: %s" % " ".join(reserved_pks)
             resp += reserved_resp
-        except Exception, e:
+        except Exception as e:
             resp += str(e)
-        
+
     return HttpResponse(resp)
 
 def live_builds(request):
@@ -160,7 +160,7 @@ def _build_branches(project, branch_list):
             else:
                 not_building.add(version.slug)
     return (to_build, not_building)
-    
+
 
 def _build_url(url, branches):
     try:
@@ -179,7 +179,7 @@ def _build_url(url, branches):
             msg = '(URL Build) Not Building: %s [%s]' % (url, ' '.join(not_building))
             pc_log.info(msg)
             return HttpResponse(msg)
-    except Exception, e:
+    except Exception as e:
         if e.__class__ == NoProjectException:
             raise
         msg = "(URL Build) Failed: %s:%s" % (url, e)
@@ -220,7 +220,7 @@ def github_build(request):
                 # Version doesn't exist yet, so use classic build method
                 update_docs.delay(pk=proj.pk)
                 pc_log.info("Created new project %s" % (proj))
-            except Exception, e:
+            except Exception as e:
                 pc_log.error("Error creating new project %s: %s" % (name, e))
                 return HttpResponseNotFound('Repo not found')
     else:
@@ -321,7 +321,7 @@ def default_docs_kwargs(request, project_slug=None):
             # Try with underscore, for legacy
             try:
                 proj = Project.objects.get(slug=project_slug.replace('-', '_'))
-            except (Project.DoesNotExist):
+            except Project.DoesNotExist:
                 proj = None
     else:
         # If project_slug isn't in URL pattern, it's set in subdomain
@@ -332,7 +332,7 @@ def default_docs_kwargs(request, project_slug=None):
             # Try with underscore, for legacy
             try:
                 proj = Project.objects.get(slug=request.slug.replace('-', '_'))
-            except (Project.DoesNotExist):
+            except Project.DoesNotExist:
                 proj = None
     if not proj:
         raise Http404("Project slug not found")

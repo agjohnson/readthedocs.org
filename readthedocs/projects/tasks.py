@@ -99,15 +99,15 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
             del version_data['project']
             try:
                 api.version(version.pk).put(version_data)
-            except Exception, e:
+            except Exception as e:
                 log.error(LOG_TEMPLATE.format(project=version.project.slug, version=version.slug, msg="Unable to put a new version"), exc_info=True)
-    except vcs_support_utils.LockTimeout, e:
+    except vcs_support_utils.LockTimeout as e:
         results['checkout'] = (999, "", "Version locked, retrying in 5 minutes.")
         log.info(LOG_TEMPLATE.format(project=version.project.slug, version=version.slug, msg="Unable to lock, will retry"))
         # http://celery.readthedocs.org/en/3.0/userguide/tasks.html#retrying
         # Should completely retry the task for us until max_retries is exceeded
         update_docs.retry(exc=e, throw=False)
-    except Exception, e:
+    except Exception as e:
         log.error(LOG_TEMPLATE.format(project=version.project.slug, version=version.slug, msg="Top-level Build Failure"), exc_info=True)
     finally:
         record_build(api=api, build=build, record=record, results=results, state='finished')
@@ -239,7 +239,7 @@ def setup_vcs(version, build, api):
     log.info(LOG_TEMPLATE.format(project=version.project.slug, version=version.slug, msg='Updating docs from VCS'))
     try:
         update_output = update_imported_docs(version.pk, api)
-    except ProjectImportError, err:
+    except ProjectImportError as err:
         log.error(LOG_TEMPLATE.format(project=version.project.slug, version=version.slug, msg='Failed to import project; skipping build'), exc_info=True)
         build['state'] = 'finished'
         build['setup_error'] = (
@@ -317,8 +317,8 @@ def update_imported_docs(version_pk, api=None):
 
         try:
             apiv2.project(project.pk).sync_versions.post(version_post_data)
-        except Exception, e:
-            print "Sync Verisons Exception: %s" % e.message
+        except Exception as e:
+            print(("Sync Verisons Exception: {0}".format(e.message)))
     return ret_dict
 
 
@@ -600,7 +600,7 @@ def record_build(api, record, build, results, state):
             build['error'] += results.get(step)[2]
     try:
         ret = api.build(build['id']).put(build)
-    except Exception, e:
+    except Exception as e:
         log.error("Unable to post a new build", exc_info=True)
 
 def record_pdf(api, record, results, state, version):
@@ -617,7 +617,7 @@ def record_pdf(api, record, results, state, version):
             error=results['pdf'][2],
             exit_code=results['pdf'][0],
         ))
-    except Exception, e:
+    except Exception as e:
         log.error(LOG_TEMPLATE.format(project=version.project.slug, version=version.slug, msg="Unable to post a new build"), exc_info=True)
 
 def update_search(version):

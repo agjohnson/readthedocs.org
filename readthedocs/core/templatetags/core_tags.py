@@ -1,4 +1,4 @@
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 from django import template
 from django.utils.hashcompat import hashlib
@@ -13,7 +13,7 @@ def gravatar(email, size=48):
     omgwtfstillreading
 
     """
-    url = "http://www.gravatar.com/avatar.php?%s" % urllib.urlencode({
+    url = "http://www.gravatar.com/avatar.php?%s" % urllib.parse.urlencode({
         'gravatar_id': hashlib.md5(email).hexdigest(),
         'size': str(size)
     })

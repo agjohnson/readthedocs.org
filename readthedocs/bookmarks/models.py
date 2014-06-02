@@ -17,12 +17,12 @@ class Bookmark(models.Model):
     class Meta:
         ordering = ['-date']
 
-    def __unicode__(self):
-        return ugettext(u"Bookmark %(url)s for %(user)s (%(pk)s)") % {
-            'url': self.url,
-            'user': self.user,
-            'pk': self.pk,
-        }
+    def __str__(self):
+        return ugettext("Bookmark {url} for {user} ({pk})".format(
+            url=self.url,
+            user=self.user,
+            pk=self.pk,
+        ))
 
     def get_absolute_url(self):
         return self.url

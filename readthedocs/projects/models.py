@@ -1,7 +1,7 @@
 import fnmatch
 import logging
 import os
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 from distlib.version import UnsupportedVersionError
 from django.conf import settings
@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 class ProjectManager(models.Manager):
     def _filter_queryset(self, user, privacy_level):
-        if isinstance(privacy_level, basestring):
+        if isinstance(privacy_level, str):
             privacy_level = (privacy_level,)
         queryset = Project.objects.filter(privacy_level__in=privacy_level)
         if not user:
@@ -122,7 +122,7 @@ class Project(models.Model):
     theme = models.CharField(
         _('Theme'), max_length=20, choices=constants.DEFAULT_THEME_CHOICES,
         default=constants.THEME_DEFAULT,
-        help_text=(u'<a href="http://sphinx.pocoo.org/theming.html#builtin-'
+        help_text=('<a href="http://sphinx.pocoo.org/theming.html#builtin-'
                    'themes" target="_blank">%s</a>') % _('Examples'))
     suffix = models.CharField(_('Suffix'), max_length=10, editable=False,
                               default='.rst')
@@ -285,11 +285,11 @@ class Project(models.Model):
         # Add exceptions here for safety
         try:
             self.sync_supported_versions()
-        except Exception, e:
+        except Exception as e:
             log.error('failed to sync supported versions', exc_info=True)
         try:
             symlink(project=self.slug)
-        except Exception, e:
+        except Exception as e:
             log.error('failed to symlink project', exc_info=True)
         try:
             #update_static_metadata(project_pk=self.pk)
@@ -602,7 +602,7 @@ class Project(models.Model):
         else:
             # Having this be translatable causes this odd error:
             # ProjectImportError(<django.utils.functional.__proxy__ object at 0x1090cded0>,)
-            raise ProjectImportError(u"Conf File Missing. Please make sure you have a conf.py in your project.")
+            raise ProjectImportError("Conf File Missing. Please make sure you have a conf.py in your project.")
 
     def conf_dir(self, version='latest'):
         conf_file = self.conf_file(version)

@@ -11,6 +11,6 @@ SLUMBER_API_HOST = 'http://localhost:8000'
 PRODUCTION_DOMAIN = 'readthedocs.org'
 
 try:
-    from local_settings import *  # noqa
+    from .local_settings import *  # noqa
 except ImportError:
     pass

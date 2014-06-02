@@ -4,8 +4,8 @@ from github2.client import Github
 from vcs_support.base import BaseContributionBackend
 import base64
 import os
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class GithubContributionBackend(BaseContributionBackend):
         if not comment:
             comment = 'no comment'
         name, email = branch.user.get_profile().get_contribution_details()
-        author = u"%s <%s>" % (name, email)
+        author = "%s <%s>" % (name, email)
         self.run('git', 'commit', '-m', comment, '--author', author)
         branch = self.fallback_branch
         if self.default_branch:
@@ -105,7 +105,7 @@ class GithubContributionBackend(BaseContributionBackend):
             GITHUB_USERNAME, identifier, self.gh_name(), title, comment))
         url = 'https://github.com/api/v2/json/pulls/%s' % self._gh_name()
         log.debug(url)
-        request = urllib2.Request(url)
+        request = urllib.request.Request(url)
         auth = base64.encodestring('%s/token:%s' % (GITHUB_USERNAME,
                                                     GITHUB_TOKEN))[:-1]
         request.add_header("Authorization", 'Basic %s' % auth)
@@ -118,10 +118,10 @@ class GithubContributionBackend(BaseContributionBackend):
             'title': title,
             'body': comment,
         }
-        pull_request_data = [("pull[%s]" % k, v) for k, v in data.items()]
-        postdata = urllib.urlencode(pull_request_data)
+        pull_request_data = [("pull[%s]" % k, v) for k, v in list(data.items())]
+        postdata = urllib.parse.urlencode(pull_request_data)
         log.debug('postdata: %s' % postdata)
-        handler = urllib2.urlopen(request, postdata)
+        handler = urllib.request.urlopen(request, postdata)
         log.debug(handler.headers.dict)
         log.debug(handler.read())
 

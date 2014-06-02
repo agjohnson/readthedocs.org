@@ -28,12 +28,12 @@ class TestSupportedVersions(TestCase):
         self.pip.num_major = 1
         self.pip.num_minor = 1
         self.pip.num_point = 1
-        self.assertEqual(self.pip.supported_versions(), [u'0.2'])
+        self.assertEqual(self.pip.supported_versions(), ['0.2'])
 
         self.pip.num_major = 1
         self.pip.num_minor = 2
         self.pip.num_point = 1
-        self.assertEqual(self.pip.supported_versions(), [u'0.1', u'0.2'])
+        self.assertEqual(self.pip.supported_versions(), ['0.1', '0.2'])
 
     def test_sync_supported_versions(self):
         self.assertEqual(self.pip.versions.get(slug='0.1').supported, True)

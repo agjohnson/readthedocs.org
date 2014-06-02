@@ -79,7 +79,7 @@ class ImportedFileIndex(celery_indexes.CelerySearchIndex, indexes.Indexable):
                                         'div.document')
         try:
             to_index = strip_tags(PyQuery(content)(
-                DOCUMENT_PYQUERY_PATH).html()).replace(u'¶', '')
+                DOCUMENT_PYQUERY_PATH).html()).replace('¶', '')
         except ValueError:
             #Pyquery returns ValueError if div.document doesn't exist.
             return

@@ -94,7 +94,7 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
                 'added_versions': added_versions,
                 'deleted_versions': deleted_versions,
             })
-        except Exception, e:
+        except Exception as e:
             log.exception("Sync Versions Error: %s" % e.message)
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
 

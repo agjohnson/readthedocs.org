@@ -55,13 +55,13 @@ def process_file(filename):
             log.error('Unable to index file headers for: %s' % filename)
     if 'body' in data:
         body = PyQuery(data['body'])
-        body_content = body.text().replace(u'¶', '')
+        body_content = body.text().replace('¶', '')
         # Section stuff from inside the body
         section_list = body('.section > h2')
         for num in range(len(section_list)):
             div = section_list.eq(num).parent()
             header = section_list.eq(num)
-            title = header.text().replace(u'¶', '').strip()
+            title = header.text().replace('¶', '').strip()
             section_id = div.attr('id')
             content = div.html()
             sections.append({

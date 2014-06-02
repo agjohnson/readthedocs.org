@@ -1,6 +1,6 @@
 import csv
 import re
-from StringIO import StringIO
+from io import StringIO
 
 from projects.exceptions import ProjectImportError
 from vcs_support.base import BaseVCS, VCSVersion
