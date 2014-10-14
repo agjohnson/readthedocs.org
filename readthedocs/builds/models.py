@@ -74,7 +74,7 @@ class Version(models.Model):
         return obj
 
 
-    @property 
+    @property
     def remote_slug(self):
         if self.slug == 'latest':
             if self.project.default_branch:
@@ -240,14 +240,14 @@ class Build(models.Model):
                              default='finished')
     date = models.DateTimeField(_('Date'), auto_now_add=True)
     success = models.BooleanField(_('Success'), default=True)
-    
+
     setup = models.TextField(_('Setup'), null=True, blank=True)
     setup_error = models.TextField(_('Setup error'), null=True, blank=True)
     output = models.TextField(_('Output'), default='', blank=True)
     error = models.TextField(_('Error'), default='', blank=True)
     exit_code = models.IntegerField(_('Exit code'), max_length=3, null=True,
                                     blank=True)
-    commit = models.CharField(_('Commit'), max_length=255, null=True, blank=True) 
+    commit = models.CharField(_('Commit'), max_length=255, null=True, blank=True)
 
     class Meta:
         ordering = ['-date']
@@ -264,3 +264,21 @@ class Build(models.Model):
     @models.permalink
     def get_absolute_url(self):
         return ('builds_detail', [self.project.slug, self.pk])
+
+
+class BuildCommand(models.Model):
+    build = models.ForeignKey(Build, verbose_name=_('Build'),
+                              related_name='commands')
+    command = models.TextField(_('Command'), default='', blank=True)
+    output = models.TextField(_('Output'), default='', blank=True)
+    exit_code = models.IntegerField(_('Exit code'), max_length=3, null=True,
+                                    blank=True)
+    start_time = models.DateTimeField(_('Start time'), auto_now_add=True)
+    end_time = models.DateTimeField(_('End time'), null=True)
+
+    class Meta:
+        ordering = ['-start_time']
+        get_latest_by = 'start_time'
+
+    def __unicode__(self):
+        return ugettext(u'Build command {0}'.format(self.command))

@@ -79,6 +79,10 @@ USE_L10N = True
 SITE_ID = 1
 SECRET_KEY = 'replace-this-please'
 
+# Docker build options
+DOCKER = False
+DOCKER_IMAGE = 'rtfd-build'
+
 ACCOUNT_ACTIVATION_DAYS = 7
 
 

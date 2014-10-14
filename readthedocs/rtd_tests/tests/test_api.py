@@ -33,6 +33,37 @@ class APIBuildTests(TestCase):
         obj = json.loads(resp.content)
         self.assertEqual(obj['output'], 'Test Output')
 
+    def test_make_build_with_commands(self):
+        """
+        Make a build and add a list of commands executed
+        """
+        post_data = {
+            "project": "/api/v1/project/1/",
+            "version": "/api/v1/version/1/",
+            "success": True,
+        }
+        # Add build
+        resp = self.client.post('/api/v1/build/', data=json.dumps(post_data),
+                                content_type='application/json',
+                                HTTP_AUTHORIZATION='Basic %s' % super_auth)
+        self.assertEqual(resp.status_code, 201)
+        build = resp['location']
+        self.assertEqual(build, 'http://testserver/api/v1/build/2/')
+
+        # Add build command
+        post_data = {
+            "build": build,
+            "command": "echo test",
+            "exit_code": 1,
+            "output": "test",
+        }
+        resp = self.client.post('/api/v1/build_command')
+        resp = self.client.get('/api/v1/build/1/', data={'format': 'json'},
+                               HTTP_AUTHORIZATION='Basic %s' % super_auth)
+        self.assertEqual(resp.status_code, 200)
+        obj = json.loads(resp.content)
+        self.assertEqual(obj['output'], 'Test Output')
+
 
 class APITests(TestCase):
     fixtures = ['eric.json', 'test_data.json']

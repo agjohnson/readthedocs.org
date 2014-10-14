@@ -77,7 +77,7 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
         if vcs_results:
             results.update(vcs_results)
 
-        if docker:
+        if settings.DOCKER or docker:
             record_build(
                 api=api, build=build, record=record, results=results, state='building')
             build_results = run_docker(version)
@@ -169,8 +169,13 @@ def run_docker(version):
     if os.path.exists(serialized_path):
         os.remove(serialized_path)
     path = version.project.doc_path
-    docker_results = run('docker run -v %s:/home/docs/checkouts/readthedocs.org/user_builds/%s ericholscher/readthedocs-build /bin/bash /home/docs/run.sh %s' %
-                         (path, version.project.slug, version.project.slug))
+    docker_results = run(('docker run -v {path}:{mount} {image} '
+                          '/bin/bash /home/docs/run.sh {slug}')
+                         .format(path=path,
+                                 mount=os.path.join('/home/docs/checkouts/readthedocs.org/user_builds/',
+                                                    version.project.slug),
+                                 image=getattr(settings, 'DOCKER_IMAGE', 'rtfd-build'),
+                                 slug=version.project.slug))
     path = os.path.join(version.project.doc_path, 'build.json')
     if os.path.exists(path):
         json_file = open(path)
@@ -181,7 +186,8 @@ def run_docker(version):
     return serialized_results
 
 
-def docker_build(version_pk, pdf=True, man=True, epub=True, dash=True, search=True, force=False, intersphinx=True, localmedia=True):
+def docker_build(version_pk, pdf=True, man=True, epub=True, dash=True,
+                 search=True, force=False, intersphinx=True, localmedia=True):
     """
     The code that executes inside of docker
     """
