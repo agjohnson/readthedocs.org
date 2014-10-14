@@ -12,41 +12,41 @@ class Backend(BaseVCS):
 
     def update(self):
         super(Backend, self).update()
-        retcode = self.run('bzr', 'status')[0]
-        if retcode == 0:
+        cmd = self.run('bzr', 'status')
+        if cmd.successful():
             self.up()
         else:
             self.clone()
 
     def up(self):
-        retcode = self.run('bzr', 'revert')[0]
-        if retcode != 0:
+        cmd = self.run('bzr', 'revert')
+        if cmd.failed():
             raise ProjectImportError(
                 ("Failed to get code from '%s' (bzr revert): %s"
-                 % (self.repo_url, retcode))
+                 % (self.repo_url, cmd.exit_code))
             )
         up_output = self.run('bzr', 'up')
         if up_output[0] != 0:
             raise ProjectImportError(
                 ("Failed to get code from '%s' (bzr up): %s"
-                 % (self.repo_url, retcode))
+                 % (self.repo_url, cmd.exit_code))
             )
         return up_output
 
     def clone(self):
         self.make_clean_working_dir()
-        retcode = self.run('bzr', 'checkout', self.repo_url, '.')[0]
-        if retcode != 0:
+        cmd = self.run('bzr', 'checkout', self.repo_url, '.')
+        if cmd.failed():
             raise ProjectImportError(
                 ("Failed to get code from '%s' (bzr checkout): %s"
-                 % (self.repo_url, retcode))
+                 % (self.repo_url, cmd.exit_code))
             )
 
     @property
     def tags(self):
-        retcode, stdout = self.run('bzr', 'tags')[:2]
+        cmd = self.run('bzr', 'tags')
         # error (or no tags found)
-        if retcode != 0:
+        if cmd.failed():
             return []
         return self.parse_tags(stdout)
 
@@ -78,8 +78,8 @@ class Backend(BaseVCS):
 
     @property
     def commit(self):
-        retcode, stdout = self.run('bzr', 'revno')[:2]
-        return stdout.strip()
+        cmd = self.run('bzr', 'revno')
+        return cmd.output['output'].strip()
 
     def checkout(self, identifier=None):
         super(Backend, self).checkout()

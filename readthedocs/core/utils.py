@@ -2,14 +2,18 @@ import getpass
 import logging
 import os
 import shutil
-
+import subprocess
+from datetime import datetime
 from urlparse import urlparse
 
 from django.conf import settings
 
+import tastyapi.slum
+
 log = logging.getLogger(__name__)
 
 SYNC_USER = getattr(settings, 'SYNC_USER', getpass.getuser())
+
 
 def copy(path, target, file=False):
     """
@@ -137,9 +141,81 @@ def clean_url(url):
         scheme, netloc = "http", parsed.path
     return netloc
 
+
 def cname_to_slug(host):
     from dns import resolver
     answer = [ans for ans in resolver.query(host, 'CNAME')][0]
     domain = answer.target.to_unicode()
     slug = domain.split('.')[0]
     return slug
+
+
+class ShellCommand(object):
+    '''Shell command wrapper to return stdout and stderr
+
+    This exists to track not just the output, but the command run and stats
+    around the command as well. This will take the place of just returning the
+    exit code and stderr/stdout.
+    '''
+
+    def __init__(self, command, cwd=None, shell=False, env=None,
+                 combine_output=True):
+        self.command = command
+        self.output = {
+            'output': None,
+            'error': None,
+        }
+        self.exit_code = None
+        self.start_time = None
+        self.end_time = None
+        self.cwd = cwd
+        self.shell = shell
+        if env is None:
+            env = os.environ.copy()
+        self.env = env
+        self.combine_output = combine_output
+
+    def run(self, **kwargs):
+        '''Run command, tracking start/end time and exit code
+
+        **kwargs
+            Arguments to pass on to command execution
+        '''
+        # Redirect streams
+        stream_out = subprocess.PIPE
+        stream_err = subprocess.PIPE
+        if self.combine_output:
+            stream_err = subprocess.STDOUT
+
+        process = subprocess.Popen(
+            self.command, stdout=stream_out, stderr=stream_err, cwd=self.cwd,
+            shell=self.shell, env=self.env)
+
+        self.start_time = datetime.now()
+        (self.output['output'], self.output['error']) = process.communicate()
+        self.exit_code = process.returncode
+        self.end_time = datetime.now()
+
+        return self
+
+    def successful(self):
+        return self.exit_code == 0
+
+    def failed(self):
+        return self.exit_code != 0
+
+    def post_command(self, build, api=None):
+        '''Post command to api, given build'''
+        if api is None:
+            api = tastyapi.slum.apiv2
+        command = self.command
+        if isinstace(command, list):
+            command = ' '.join(command)
+        build_command = api.buildcommand.post({
+            'build': build,
+            'command': command,
+            'output': self.output['output'],
+            'exit_code': self.exit_code,
+            'start_time': self.start_time,
+            'end_time': self.end_time,
+        })

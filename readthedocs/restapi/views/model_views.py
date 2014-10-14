@@ -6,13 +6,14 @@ from rest_framework import decorators, permissions, viewsets, status
 from rest_framework.renderers import JSONPRenderer, JSONRenderer, BrowsableAPIRenderer
 from rest_framework.response import Response
 
-from builds.models import Version
+from builds.models import Build, BuildCommand, Version
 from builds.filters import VersionFilter
 from oauth import utils as oauth_utils
 from projects.models import Project, EmailHook
 from projects.filters import ProjectFilter
 
-from restapi.serializers import ProjectSerializer, VersionSerializer
+from restapi.serializers import (ProjectSerializer, BuildSerializer,
+                                 BuildCommandSerializer, VersionSerializer)
 from restapi.permissions import RelatedProjectIsOwner
 import restapi.utils as api_utils
 
@@ -148,3 +149,25 @@ class VersionViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({
             'downloads': downloads
         })
+
+
+class BuildViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
+    serializer_class = BuildSerializer
+    model = Build
+
+    def get_queryset(self):
+        queryset = Build.objects.all()
+        return queryset
+
+
+class BuildCommandViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
+    serializer_class = BuildCommandSerializer
+    model = BuildCommand
+
+    def get_queryset(self):
+        queryset = BuildCommand.objects.all()
+        return queryset

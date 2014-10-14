@@ -7,6 +7,8 @@ import subprocess
 
 from django.template.defaultfilters import slugify
 
+from core.utils import ShellCommand
+
 log = logging.getLogger(__name__)
 
 
@@ -40,6 +42,7 @@ class BaseCLI(object):
     Helper class for CLI-heavy classes.
     """
     log_tmpl = u'VCS[{name}:{ident}]: {args}'
+    working_dir = None
 
     def __call__(self, *args):
         return self.run(args)
@@ -48,30 +51,27 @@ class BaseCLI(object):
         """
         :param bits: list of command and args. See `subprocess` docs
         """
-        process = subprocess.Popen(args, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   cwd=self.working_dir, shell=False,
-                                   env=self.env)
+        cmd = ShellCommand(command=args, cwd=self.working_dir)
+
         try:
-            log.info(self.log_tmpl.format(ident=basename(self.working_dir),
+            log.info(self.log_tmpl.format(ident=self.working_dir,
                                           name=self.name,
                                           args=' '.join(args)))
         except UnicodeDecodeError:
             # >:x
             pass
-        stdout, stderr = process.communicate()
+
+        cmd.run()
+
         try:
-            log.info(self.log_tmpl.format(ident=basename(self.working_dir),
+            log.info(self.log_tmpl.format(ident=self.working_dir,
                                           name=self.name,
-                                          args=stdout))
+                                          args=cmd.output['output']))
         except UnicodeDecodeError:
             # >:x
             pass
-        return (process.returncode, stdout, stderr)
 
-    @property
-    def env(self):
-        return os.environ.copy()
+        return cmd
 
 
 class BaseVCS(BaseCLI):
@@ -131,7 +131,6 @@ class BaseVCS(BaseCLI):
         """
         raise NotImplementedError
 
-    
     @property
     def commit(self):
         """

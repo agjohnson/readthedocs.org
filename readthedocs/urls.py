@@ -14,8 +14,6 @@ from projects.filters import ProjectFilter
 from projects.constants import LANGUAGES_REGEX
 
 v1_api = Api(api_name='v1')
-v1_api.register(BuildResource())
-v1_api.register(BuildCommandResource())
 v1_api.register(UserResource())
 v1_api.register(ProjectResource())
 v1_api.register(VersionResource())

@@ -36,6 +36,7 @@ log = logging.getLogger(__name__)
 HTML_ONLY = getattr(settings, 'HTML_ONLY_PROJECTS', ())
 
 
+
 @task(default_retry_delay=7 * 60, max_retries=5)
 @restoring_chdir
 def update_docs(pk, version_pk=None, record=True, docker=False,
@@ -70,33 +71,25 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
     build = create_build(version, api, record)
     results = {}
 
+    import pdb; pdb.set_trace()
+
     try:
-        record_build(
-            api=api, build=build, record=record, results=results, state='cloning')
+        record_build(api=api, build=build, record=record, state='cloning')
         vcs_results = setup_vcs(version, build, api)
-        if vcs_results:
-            results.update(vcs_results)
 
         if settings.DOCKER or docker:
-            record_build(
-                api=api, build=build, record=record, results=results, state='building')
-            build_results = run_docker(version)
-            results.update(build_results)
+            record_build(api=api, build=build, record=record, state='building')
+            _ = run_docker(build=build, version=version)
         else:
-            record_build(
-                api=api, build=build, record=record, results=results, state='installing')
-            setup_results = setup_environment(version)
-            results.update(setup_results)
+            record_build(api=api, build=build, record=record, state='installing')
+            _ = setup_environment(version)
 
-            record_build(
-                api=api, build=build, record=record, results=results, state='building')
-            build_results = build_docs(
-                version, force, pdf, man, epub, dash, search, localmedia)
-            results.update(build_results)
+            record_build(api=api, build=build, record=record, state='building')
+            _ = build_docs(build, version, force, pdf, man, epub, dash,
+                           search, localmedia)
 
         move_files(version, results)
-        record_pdf(api=api, record=record, results=results,
-                   state='finished', version=version)
+        record_pdf(api=api, record=record, state='finished', version=version)
         finish_build(version=version, build=build, results=results)
 
         if results['html'][0] == 0:
@@ -124,8 +117,7 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
         log.error(LOG_TEMPLATE.format(project=version.project.slug,
                                       version=version.slug, msg="Top-level Build Failure"), exc_info=True)
     finally:
-        record_build(
-            api=api, build=build, record=record, results=results, state='finished')
+        record_build(api=api, build=build, record=record, state='finished')
         log.info(LOG_TEMPLATE.format(
             project=version.project.slug, version='', msg='Build finished'))
 
@@ -626,7 +618,7 @@ def create_build(version, api, record):
     return build
 
 
-def record_build(api, record, build, results, state):
+def record_build(api, record, build, state, results=None):
     """
     Record a build by hitting the API.
 

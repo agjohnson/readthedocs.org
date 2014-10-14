@@ -2,9 +2,13 @@ from django.conf.urls import url, patterns, include
 
 from rest_framework import routers
 
-from .views.model_views import ProjectViewSet, NotificationViewSet, VersionViewSet
+from .views.model_views import (ProjectViewSet, NotificationViewSet,
+                                BuildViewSet, BuildCommandViewSet,
+                                VersionViewSet)
 
 router = routers.DefaultRouter()
+router.register(r'build', BuildViewSet)
+router.register(r'buildcommand', BuildCommandViewSet)
 router.register(r'version', VersionViewSet)
 router.register(r'project', ProjectViewSet)
 router.register(r'notification', NotificationViewSet)

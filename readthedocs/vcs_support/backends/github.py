@@ -41,7 +41,7 @@ class GithubContributionBackend(BaseContributionBackend):
         return identifier
 
     def branch_exists(self, identifier):
-        return identifier in self.run('git', 'branch')[1]
+        return identifier in self.run('git', 'branch').output['output']
 
     def create_branch(self, identifier):
         self.repo.update()
@@ -55,7 +55,8 @@ class GithubContributionBackend(BaseContributionBackend):
         git show branch:file
         """
         identifier = self.get_branch_identifier(branch)
-        return self.run('git', 'show', '%s:%s' % (identifier, filename))[1]
+        cmd = self.run('git', 'show', '%s:%s' % (identifier, filename))
+        return cmd.output['output']
 
     def set_branch_file(self, branch, filename, contents, comment=''):
         """
@@ -148,7 +149,8 @@ class GithubContributionBackend(BaseContributionBackend):
             self.fork()
         else:
             log.info('fork found')
-        if 'rtd' not in self.run('git', 'remote')[1]:
+        cmd = self.run('git', 'remote')
+        if 'rtd' not in cmd.output['output']:
             log.info('rtd remote not yet specified')
             self.run('git', 'remote', 'add', 'rtd', self.get_remote_name())
         else:

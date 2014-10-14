@@ -44,12 +44,12 @@ class Backend(BaseVCS):
         self.checkout()
 
     def repo_exists(self):
-        code, out, err = self.run('git', 'status')
-        return code == 0
+        cmd = self.run('git', 'status')
+        return cmd.successful()
 
     def fetch(self):
-        code, out, err = self.run('git', 'fetch', '--prune')
-        if code != 0:
+        cmd = self.run('git', 'fetch', '--prune')
+        if cmd.failed():
             raise ProjectImportError(
                 "Failed to get code from '%s' (git fetch): %s" % (
                     self.repo_url, code)
@@ -60,17 +60,16 @@ class Backend(BaseVCS):
             branch = self.default_branch or self.fallback_branch
             revision = 'origin/%s' % branch
 
-        code, out, err = self.run('git', 'checkout',
-                                  '--force', '--quiet', revision)
-        if code != 0:
+        cmd = self.run('git', 'checkout', '--force', '--quiet', revision)
+        if cmd.failed():
             log.warning("Failed to checkout revision '%s': %s" % (
                 revision, code))
-        return [code, out, err]
+        return cmd
 
     def clone(self):
-        code, out, err = self.run('git', 'clone', '--recursive', '--quiet',
-                                  self.repo_url, '.')
-        if code != 0:
+        cmd = self.run('git', 'clone', '--recursive', '--quiet',
+                       self.repo_url, '.')
+        if cmd.failed():
             raise ProjectImportError(
                 "Failed to get code from '%s' (git clone): %s" % (
                     self.repo_url, code)
@@ -78,11 +77,11 @@ class Backend(BaseVCS):
 
     @property
     def tags(self):
-        retcode, stdout, err = self.run('git', 'show-ref', '--tags')
+        cmd = self.run('git', 'show-ref', '--tags')
         # error (or no tags found)
-        if retcode != 0:
+        if cmd.failed():
             return []
-        return self.parse_tags(stdout)
+        return self.parse_tags(cmd.output['output'])
 
     def parse_tags(self, data):
         """
@@ -113,11 +112,11 @@ class Backend(BaseVCS):
     @property
     def branches(self):
         # Only show remote branches
-        retcode, stdout, err = self.run('git', 'branch', '-r')
+        cmd = self.run('git', 'branch', '-r')
         # error (or no tags found)
-        if retcode != 0:
+        if cmd.failed():
             return []
-        return self.parse_branches(stdout)
+        return self.parse_branches(cmd.output['output'])
 
     def parse_branches(self, data):
         """
@@ -150,8 +149,8 @@ class Backend(BaseVCS):
 
     @property
     def commit(self):
-        retcode, stdout, err = self.run('git', 'rev-parse', 'HEAD')
-        return stdout.strip()
+        cmd = self.run('git', 'rev-parse', 'HEAD')
+        return cmd.output['output'].strip()
 
     def checkout(self, identifier=None):
         self.check_working_dir()
@@ -171,19 +170,19 @@ class Backend(BaseVCS):
         identifier = self.find_ref(identifier)
 
         #Checkout the correct identifier for this branch.
-        code, out, err = self.checkout_revision(identifier)
-        if code != 0:
-            return code, out, err
+        cmds = []
+        cmd = self.checkout_revision(identifier)
+        cmds.append(cmd)
+        if cmd.successful():
+            # Clean any remains of previous checkouts
+            cmds.append(self.run('git', 'clean', '-d', '-f', '-f'))
 
-        # Clean any remains of previous checkouts
-        self.run('git', 'clean', '-d', '-f', '-f')
+            # Update submodules
+            cmds.append(self.run('git', 'submodule', 'sync'))
+            cmds.append(self.run('git', 'submodule', 'update',
+                                '--init', '--recursive', '--force'))
 
-        # Update submodules
-        self.run('git', 'submodule', 'sync')
-        self.run('git', 'submodule', 'update',
-                 '--init', '--recursive', '--force')
-
-        return code, out, err
+        return cmds
 
     def find_ref(self, ref):
         # Check if ref starts with 'origin/'
@@ -197,8 +196,8 @@ class Backend(BaseVCS):
         return ref
 
     def ref_exists(self, ref):
-        code, out, err = self.run('git', 'show-ref', ref)
-        return code == 0
+        cmd = self.run('git', 'show-ref', ref)
+        return cmd.successful()
 
     @property
     def env(self):

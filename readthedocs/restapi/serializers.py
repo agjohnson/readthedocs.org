@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
-from builds.models import Version
+from builds.models import Build, BuildCommand, Version
 from projects.models import Project
+
 
 class ProjectSerializer(serializers.ModelSerializer):
     downloads = serializers.CharField(source='get_downloads', read_only=True)
@@ -9,26 +10,44 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = (
-            'id', 
+            'id',
             'name', 'slug', 'description', 'language',
             'repo', 'repo_type',
             'default_version', 'default_branch',
             'documentation_type',
             'users',
             'downloads',
-            )
+        )
+
 
 class VersionSerializer(serializers.ModelSerializer):
     project = ProjectSerializer()
-    
+
     class Meta:
         model = Version
         fields = (
-            'id', 
+            'id',
             'project', 'slug',
             'identifier', 'verbose_name',
-            'active', 'built', 
-            )
+            'active', 'built',
+        )
+
+
+class BuildSerializer(serializers.ModelSerializer):
+    version = VersionSerializer()
+
+    class Meta:
+        model = Build
+        fields = ('id',)
+
+
+class BuildCommandSerializer(serializers.ModelSerializer):
+    build = BuildSerializer()
+
+    class Meta:
+        model = BuildCommand
+        fields = ('id', 'command', 'start_time', 'end_time', 'exit_code',
+                  'output')
 
 
 class SearchIndexSerializer(serializers.Serializer):
