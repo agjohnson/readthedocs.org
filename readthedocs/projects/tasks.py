@@ -71,11 +71,11 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
     build = create_build(version, api, record)
     results = {}
 
-    import pdb; pdb.set_trace()
-
     try:
         record_build(api=api, build=build, record=record, state='cloning')
-        vcs_results = setup_vcs(version, build, api)
+        cmd = setup_vcs(version, build, api)
+        import pdb; pdb.set_trace()
+        cmd.post(build)
 
         if settings.DOCKER or docker:
             record_build(api=api, build=build, record=record, state='building')
@@ -622,69 +622,44 @@ def record_build(api, record, build, state, results=None):
     """
     Record a build by hitting the API.
 
-    Returns nothing
+    Returns build id
     """
 
     if not record:
         return None
 
-    setup_steps = ['checkout', 'venv', 'sphinx', 'requirements', 'install']
-    output_steps = ['html']
-    all_steps = setup_steps + output_steps
-
     build['state'] = state
-    if 'html' in results:
-        build['success'] = results['html'][0] == 0
-    else:
-        build['success'] = False
+    # TODO fix this
+    #if 'html' in results:
+    #    build['success'] = results['html'][0] == 0
+    #else:
+    #    build['success'] = False
 
-    # Set global state
-    # for step in all_steps:
-    #     if results.get(step, False):
-    #         if results.get(step)[0] != 0:
-    #             results['success'] = False
-
-    build['exit_code'] = max([results.get(step, [0])[0] for step in all_steps])
-
-    build['setup'] = build['setup_error'] = ""
-    build['output'] = build['error'] = ""
-
-    for step in setup_steps:
-        if step in results:
-            build['setup'] += "\n\n%s\n-----\n\n" % step
-            build['setup'] += results.get(step)[1]
-            build['setup_error'] += "\n\n%s\n-----\n\n" % step
-            build['setup_error'] += results.get(step)[2]
-
-    for step in output_steps:
-        if step in results:
-            build['output'] += "\n\n%s\n-----\n\n" % step
-            build['output'] += results.get(step)[1]
-            build['error'] += "\n\n%s\n-----\n\n" % step
-            build['error'] += results.get(step)[2]
     try:
         ret = api.build(build['id']).put(build)
+        import pdb; pdb.set_trace()
     except Exception, e:
         log.error("Unable to post a new build", exc_info=True)
+    return ret
 
 
-def record_pdf(api, record, results, state, version):
+def record_pdf(api, record, state, version, results=None):
     if not record:
         return None
     try:
-        api.build.post(dict(
+        build = api.build.post(dict(
             state=state,
             project='/api/v1/project/%s/' % version.project.pk,
             version='/api/v1/version/%s/' % version.pk,
-            success=results['pdf'][0] == 0,
+            # TODO fix
+            success=True,
             type='pdf',
-            output=results['pdf'][1],
-            error=results['pdf'][2],
-            exit_code=results['pdf'][0],
         ))
     except Exception:
         log.error(LOG_TEMPLATE.format(project=version.project.slug,
                                       version=version.slug, msg="Unable to post a new build"), exc_info=True)
+    finally:
+        return build
 
 
 def update_search(version):
