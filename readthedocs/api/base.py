@@ -206,8 +206,6 @@ class VersionResource(ModelResource):
 class BuildResource(ModelResource):
     project = fields.ForeignKey('api.base.ProjectResource', 'project')
     version = fields.ForeignKey('api.base.VersionResource', 'version')
-    commands = fields.ToManyField('api.base.BuildCommandResource', 'commands',
-                                  related_name='build', full=True, null=True)
 
     class Meta:
         always_return_data = True
@@ -221,7 +219,6 @@ class BuildResource(ModelResource):
             "slug": ALL_WITH_RELATIONS,
             "type": ALL_WITH_RELATIONS,
             "state": ALL_WITH_RELATIONS,
-            "commands": ALL_WITH_RELATIONS,
         }
 
     def override_urls(self):
@@ -234,26 +231,7 @@ class BuildResource(ModelResource):
                 self._meta.resource_name,
                 self.wrap_view('dispatch_list'),
                 name="build_list_detail"),
-            url(r"^(?P<resource_name>%s)/(?P<project__slug>[a-z-_]+)/command$" %
-                self._meta.resource_name,
-                self.wrap_view('dispatch_list'),
-                name="build_list_detail"),
         ]
-
-
-class BuildCommandResource(ModelResource):
-
-    class Meta:
-        resource_name = 'build_command'
-        queryset = BuildCommand.objects.all()
-        include_absolute_url = True
-        always_return_data = True
-        allowed_methods = ['get', 'post', 'put']
-        authentication = PostAuthentication()
-        authorization = DjangoAuthorization()
-        filtering = {
-            'build': ALL_WITH_RELATIONS,
-        }
 
 
 class FileResource(ModelResource, SearchMixin):

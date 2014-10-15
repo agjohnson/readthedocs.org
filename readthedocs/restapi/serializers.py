@@ -38,7 +38,7 @@ class BuildSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Build
-        fields = ('id',)
+        #fields = ('id',)
 
 
 class BuildCommandSerializer(serializers.ModelSerializer):
@@ -46,8 +46,8 @@ class BuildCommandSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BuildCommand
-        fields = ('id', 'command', 'start_time', 'end_time', 'exit_code',
-                  'output')
+        fields = ('id', 'build', 'command', 'start_time', 'end_time',
+                  'exit_code', 'output')
 
 
 class SearchIndexSerializer(serializers.Serializer):

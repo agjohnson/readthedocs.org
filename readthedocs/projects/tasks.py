@@ -26,7 +26,7 @@ from projects.constants import LOG_TEMPLATE
 from projects import symlinks
 from tastyapi import api, apiv2
 from core.utils import (copy_to_app_servers, copy_file_to_app_servers,
-                        run_on_app_servers)
+                        run_on_app_servers, ShellCommand)
 from core import utils as core_utils
 from search.parse_json import process_all_json_files
 from vcs_support import utils as vcs_support_utils
@@ -69,24 +69,21 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
         project=project.slug, version='', msg='Building'))
     version = ensure_version(api, project, version_pk)
     build = create_build(version, api, record)
-    results = {}
 
     try:
         record_build(api=api, build=build, record=record, state='cloning')
-        cmd = setup_vcs(version, build, api)
-        import pdb; pdb.set_trace()
-        cmd.post(build)
+        record_command(setup_vcs(version, build, api), build)
 
         if settings.DOCKER or docker:
             record_build(api=api, build=build, record=record, state='building')
-            _ = run_docker(build=build, version=version)
+            record_command(run_docker(build=build, version=version), build)
         else:
             record_build(api=api, build=build, record=record, state='installing')
-            _ = setup_environment(version)
+            record_command(setup_environment(version), build)
 
             record_build(api=api, build=build, record=record, state='building')
-            _ = build_docs(build, version, force, pdf, man, epub, dash,
-                           search, localmedia)
+            record_command(build_docs(build, version, force, pdf, man, epub,
+                                      dash, search, localmedia), build)
 
         move_files(version, results)
         record_pdf(api=api, record=record, state='finished', version=version)
@@ -106,8 +103,9 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
                 log.error(LOG_TEMPLATE.format(project=version.project.slug,
                                               version=version.slug, msg="Unable to put a new version"), exc_info=True)
     except vcs_support_utils.LockTimeout, e:
-        results['checkout'] = (
-            999, "", "Version locked, retrying in 5 minutes.")
+        # XXX do something with this
+        #results['checkout'] = (
+        #    999, "", "Version locked, retrying in 5 minutes.")
         log.info(LOG_TEMPLATE.format(project=version.project.slug,
                                      version=version.slug, msg="Unable to lock, will retry"))
         # http://celery.readthedocs.org/en/3.0/userguide/tasks.html#retrying
@@ -637,7 +635,6 @@ def record_build(api, record, build, state, results=None):
 
     try:
         ret = api.build(build['id']).put(build)
-        import pdb; pdb.set_trace()
     except Exception, e:
         log.error("Unable to post a new build", exc_info=True)
     return ret
@@ -660,6 +657,17 @@ def record_pdf(api, record, state, version, results=None):
                                       version=version.slug, msg="Unable to post a new build"), exc_info=True)
     finally:
         return build
+
+
+def record_command(objs, build):
+    '''Iterate over commands if necessary, posting each to the api'''
+    if isinstance(objs, ShellCommand):
+        objs.post(build)
+    elif isinstance(objs, list):
+        for cmd in objs:
+            record_command(cmd, build)
+    else:
+        log.error('Missed catching input: {0}'.format(objs))
 
 
 def update_search(version):

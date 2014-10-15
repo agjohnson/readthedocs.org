@@ -54,7 +54,7 @@ class BaseCLI(object):
         cmd = ShellCommand(command=args, cwd=self.working_dir)
 
         try:
-            log.info(self.log_tmpl.format(ident=self.working_dir,
+            log.info(self.log_tmpl.format(ident=basename(self.working_dir),
                                           name=self.name,
                                           args=' '.join(args)))
         except UnicodeDecodeError:
@@ -64,7 +64,7 @@ class BaseCLI(object):
         cmd.run()
 
         try:
-            log.info(self.log_tmpl.format(ident=self.working_dir,
+            log.info(self.log_tmpl.format(ident=basename(self.working_dir),
                                           name=self.name,
                                           args=cmd.output['output']))
         except UnicodeDecodeError:

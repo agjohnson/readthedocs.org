@@ -195,7 +195,6 @@ class ShellCommand(object):
         (self.output['output'], self.output['error']) = process.communicate()
         self.exit_code = process.returncode
         self.end_time = datetime.now()
-
         return self
 
     def successful(self):
@@ -204,7 +203,7 @@ class ShellCommand(object):
     def failed(self):
         return self.exit_code != 0
 
-    def post_command(self, build, api=None):
+    def post(self, build, api=None):
         '''Post command to api, given build'''
         if api is None:
             api = tastyapi.slum.apiv2
@@ -212,7 +211,7 @@ class ShellCommand(object):
         if isinstace(command, list):
             command = ' '.join(command)
         build_command = api.buildcommand.post({
-            'build': build,
+            'build': build['id'],
             'command': command,
             'output': self.output['output'],
             'exit_code': self.exit_code,
