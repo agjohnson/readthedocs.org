@@ -15,8 +15,8 @@ class Migration(SchemaMigration):
             ('command', self.gf('django.db.models.fields.TextField')(default='', blank=True)),
             ('output', self.gf('django.db.models.fields.TextField')(default='', blank=True)),
             ('exit_code', self.gf('django.db.models.fields.IntegerField')(max_length=3, null=True, blank=True)),
-            ('start_time', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
-            ('end_time', self.gf('django.db.models.fields.DateTimeField')(null=True)),
+            ('start_time', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
+            ('end_time', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
         ))
         db.send_create_signal(u'builds', ['BuildCommand'])
 
@@ -76,11 +76,11 @@ class Migration(SchemaMigration):
             'Meta': {'ordering': "['-start_time']", 'object_name': 'BuildCommand'},
             'build': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'commands'", 'to': u"orm['builds.Build']"}),
             'command': ('django.db.models.fields.TextField', [], {'default': "''", 'blank': 'True'}),
-            'end_time': ('django.db.models.fields.DateTimeField', [], {'null': 'True'}),
+            'end_time': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'exit_code': ('django.db.models.fields.IntegerField', [], {'max_length': '3', 'null': 'True', 'blank': 'True'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'output': ('django.db.models.fields.TextField', [], {'default': "''", 'blank': 'True'}),
-            'start_time': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
+            'start_time': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'})
         },
         u'builds.version': {
             'Meta': {'ordering': "['-verbose_name']", 'unique_together': "[('project', 'slug')]", 'object_name': 'Version'},

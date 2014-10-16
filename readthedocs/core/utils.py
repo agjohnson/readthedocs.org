@@ -168,12 +168,24 @@ class ShellCommand(object):
         self.exit_code = None
         self.start_time = None
         self.end_time = None
+        if cwd is None:
+            cwd = os.getcwd()
         self.cwd = cwd
         self.shell = shell
         if env is None:
             env = os.environ.copy()
+        env['READTHEDOCS'] = 'True'
+        if 'DJANGO_SETTINGS_MODULE' in env:
+            del env['DJANGO_SETTINGS_MODULE']
+        if 'PYTHONPATH' in env:
+            del env['PYTHONPATH']
         self.env = env
         self.combine_output = combine_output
+
+    def from_command(cls, command, **kwargs):
+        self = cls(command, **kwargs)
+        self.run()
+        return self
 
     def run(self, **kwargs):
         '''Run command, tracking start/end time and exit code
@@ -187,14 +199,21 @@ class ShellCommand(object):
         if self.combine_output:
             stream_err = subprocess.STDOUT
 
-        process = subprocess.Popen(
-            self.command, stdout=stream_out, stderr=stream_err, cwd=self.cwd,
-            shell=self.shell, env=self.env)
-
-        self.start_time = datetime.now()
-        (self.output['output'], self.output['error']) = process.communicate()
-        self.exit_code = process.returncode
-        self.end_time = datetime.now()
+        log.info('Executing command {0}, cwd={1}'.format(self.command, self.cwd))
+        try:
+            process = subprocess.Popen(
+                self.command, stdout=stream_out, stderr=stream_err, cwd=self.cwd,
+                shell=self.shell, env=self.env)
+            self.start_time = datetime.now()
+            (self.output['output'], self.output['error']) = process.communicate()
+            self.exit_code = process.returncode
+        except:
+            self.output['output'] = ''
+            self.output['error'] = traceback.format_exc()
+            self.exit_code = -1
+            log.error("Command failed", exc_info=True)
+        finally:
+            self.end_time = datetime.now()
         return self
 
     def successful(self):
@@ -208,13 +227,14 @@ class ShellCommand(object):
         if api is None:
             api = tastyapi.slum.apiv2
         command = self.command
-        if isinstace(command, list):
+        if isinstance(command, list):
             command = ' '.join(command)
-        build_command = api.buildcommand.post({
+        data = {
             'build': build['id'],
             'command': command,
             'output': self.output['output'],
             'exit_code': self.exit_code,
-            'start_time': self.start_time,
-            'end_time': self.end_time,
-        })
+            'start_time': str(self.start_time),
+            'end_time': str(self.end_time),
+        }
+        build_command = api.buildcommand.post(data)

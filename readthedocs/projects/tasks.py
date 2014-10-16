@@ -82,8 +82,8 @@ def update_docs(pk, version_pk=None, record=True, docker=False,
             record_command(setup_environment(version), build)
 
             record_build(api=api, build=build, record=record, state='building')
-            record_command(build_docs(build, version, force, pdf, man, epub,
-                                      dash, search, localmedia), build)
+            record_command(build_docs(version, force, pdf, man, epub, dash,
+                                      search, localmedia), build)
 
         move_files(version, results)
         record_pdf(api=api, record=record, state='finished', version=version)
@@ -294,7 +294,7 @@ def update_imported_docs(version_pk, api=None):
     version_data = api.version(version_pk).get()
     version = make_api_version(version_data)
     project = version.project
-    ret_dict = {}
+    cmds = []
 
     # Make Dirs
     if not os.path.exists(project.doc_path):
@@ -320,16 +320,14 @@ def update_imported_docs(version_pk, api=None):
             )
             version_slug = version.slug
             version_repo = project.vcs_repo(version_slug)
-            ret_dict['checkout'] = version_repo.checkout(
-                version.identifier,
-            )
+            cmds.append(version_repo.checkout(version.identifier))
         else:
             # Does this ever get called?
             log.info(LOG_TEMPLATE.format(
                 project=project.slug, version=version.slug, msg='Updating to latest revision'))
             version_slug = 'latest'
             version_repo = project.vcs_repo(version_slug)
-            ret_dict['checkout'] = version_repo.update()
+            cmds.append(version_repo.update())
 
         # Update tags/version
 
@@ -353,14 +351,14 @@ def update_imported_docs(version_pk, api=None):
             apiv2.project(project.pk).sync_versions.post(version_post_data)
         except Exception, e:
             print "Sync Versions Exception: %s" % e.message
-    return ret_dict
+    return cmds
 
 
 def setup_environment(version):
     """
     Build the virtualenv and install the project into it.
     """
-    ret_dict = {}
+    cmds = []
     project = version.project
     if project.use_virtualenv:
         build_dir = os.path.join(
@@ -375,14 +373,14 @@ def setup_environment(version):
             site_packages = '--no-site-packages'
         # Here the command has been modified to support different
         # interpreters.
-        ret_dict['venv'] = run(
+        cmds.append(ShellCommand.from_command(
             '{cmd} {site_packages} {path}'.format(
                 cmd='virtualenv-2.7 -p {interpreter}'.format(
                     interpreter=project.python_interpreter),
                 site_packages=site_packages,
                 path=project.venv_path(version=version.slug)
             )
-        )
+        ))
         # Other code expects sphinx-build to be installed inside the
         # virtualenv.  Using the -I option makes sure it gets installed
         # even if it is already installed system-wide (and
@@ -393,40 +391,42 @@ def setup_environment(version):
             ignore_option = ''
         sphinx = 'sphinx==1.2.2'
         if project.python_interpreter != 'python3':
-            ret_dict['sphinx'] = run(
+            cmds.append(ShellCommand.from_command(
                 ('{cmd} install -U {ignore_option} {sphinx} '
                  'virtualenv==1.10.1 setuptools==1.1 '
                  'docutils==0.11 git+git://github.com/ericholscher/readthedocs-sphinx-ext#egg=readthedocs_ext').format(
                     cmd=project.venv_bin(version=version.slug, bin='pip'),
-                    sphinx=sphinx, ignore_option=ignore_option))
+                    sphinx=sphinx, ignore_option=ignore_option)))
         else:
             # python 3 specific hax
-            ret_dict['sphinx'] = run(
+            cmds.append(ShellCommand.from_command(
                 ('{cmd} install -U {ignore_option} {sphinx} '
                  'virtualenv==1.9.1 docutils==0.11 git+git://github.com/ericholscher/readthedocs-sphinx-ext#egg=readthedocs_ext').format(
                     cmd=project.venv_bin(version=version.slug, bin='pip'),
-                    sphinx=sphinx, ignore_option=ignore_option))
+                    sphinx=sphinx, ignore_option=ignore_option)))
 
         if project.requirements_file:
             os.chdir(project.checkout_path(version.slug))
-            ret_dict['requirements'] = run(
+            cmds.append(ShellCommand.from_command(
                 '{cmd} install --exists-action=w -r {requirements}'.format(
                     cmd=project.venv_bin(version=version.slug, bin='pip'),
-                    requirements=project.requirements_file))
+                    requirements=project.requirements_file)))
         os.chdir(project.checkout_path(version.slug))
         if os.path.isfile("setup.py"):
             if getattr(settings, 'USE_PIP_INSTALL', False):
-                ret_dict['install'] = run(
+                cmds.append(ShellCommand.from_command(
                     '{cmd} install --ignore-installed .'.format(
-                        cmd=project.venv_bin(version=version.slug, bin='pip')))
+                        cmd=project.venv_bin(version=version.slug, bin='pip'))))
             else:
-                ret_dict['install'] = run(
+                cmds.append(ShellCommand.from_command(
                     '{cmd} setup.py install --force'.format(
                         cmd=project.venv_bin(version=version.slug,
-                                             bin='python')))
+                                             bin='python'))))
         else:
-            ret_dict['install'] = (999, "", "No setup.py, skipping install")
-    return ret_dict
+            pass
+            # XXX handle this with exception
+            #ret_dict['install'] = (999, "", "No setup.py, skipping install")
+    return cmds
 
 
 @task()

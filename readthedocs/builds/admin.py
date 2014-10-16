@@ -3,7 +3,7 @@
 """
 
 from django.contrib import admin
-from builds.models import Build, VersionAlias, Version
+from builds.models import Build, BuildCommand, VersionAlias, Version
 from guardian.admin import GuardedModelAdmin
 
 
@@ -17,5 +17,6 @@ class VersionAdmin(GuardedModelAdmin):
 
 
 admin.site.register(Build, BuildAdmin)
+admin.site.register(BuildCommand)
 admin.site.register(VersionAlias)
 admin.site.register(Version, VersionAdmin)
