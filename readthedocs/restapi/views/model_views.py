@@ -151,7 +151,7 @@ class VersionViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 
-class BuildViewSet(viewsets.ReadOnlyModelViewSet):
+class BuildViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
     serializer_class = BuildSerializer
@@ -162,7 +162,7 @@ class BuildViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
-class BuildCommandViewSet(viewsets.ReadOnlyModelViewSet):
+class BuildCommandViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
     serializer_class = BuildCommandSerializer

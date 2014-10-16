@@ -273,8 +273,8 @@ class BuildCommand(models.Model):
     output = models.TextField(_('Output'), default='', blank=True)
     exit_code = models.IntegerField(_('Exit code'), max_length=3, null=True,
                                     blank=True)
-    start_time = models.DateTimeField(_('Start time'), auto_now_add=True)
-    end_time = models.DateTimeField(_('End time'), null=True)
+    start_time = models.DateTimeField(_('Start time'), null=True, blank=True)
+    end_time = models.DateTimeField(_('End time'), null=True, blank=True)
 
     class Meta:
         ordering = ['-start_time']

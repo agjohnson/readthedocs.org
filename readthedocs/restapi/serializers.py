@@ -34,15 +34,13 @@ class VersionSerializer(serializers.ModelSerializer):
 
 
 class BuildSerializer(serializers.ModelSerializer):
-    version = VersionSerializer()
 
     class Meta:
         model = Build
-        #fields = ('id',)
+        fields = ('id', 'project', 'version')
 
 
 class BuildCommandSerializer(serializers.ModelSerializer):
-    build = BuildSerializer()
 
     class Meta:
         model = BuildCommand
