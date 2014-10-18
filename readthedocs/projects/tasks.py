@@ -67,23 +67,40 @@ class BuildSteps(object):
                    **kwargs)
 
     def run(self, command, step=None, **kwargs):
+        """
+        Run command and record command in API
+
+        Executes command and triggers saving object in the API afterwards.
+        """
         cmd = ShellCommand(command, **kwargs)
         cmd.run()
         # XXX catch build id missing here
-        cmd.post(self.build)
+        self.record_cmd(cmd, step)
+
+    def record_cmd(self, command, step=None):
+        """
+        Record executed command in the API
+
+        Record :py:cls:`ShellCommand` instance by posting to the API. If
+        :py:data:`step` is set, save the command in a dictionary for lookup
+        after by other build steps.
+        """
+        if not isinstance(command, ShellCommand):
+            raise TypeError('Expecting ShellCommand type')
+        command.post(self.build)
         if step is not None:
-            self.steps[step] = cmd
-        return cmd
+            self.steps[step] = command
+        return command
 
     def step(self, step):
         return self.steps.get(step, None)
 
     def build(self):
         self.update(state='cloning')
-        #record_command(setup_vcs(version, build, api), build)
+        self.setup_vcs()
 
         self.update(state='installing')
-        #record_command(setup_environment(version), build)
+        setup_environment()
 
         self.update(state='building')
         #record_command(build_docs(version, force, pdf, man, epub, dash,
@@ -95,18 +112,116 @@ class BuildSteps(object):
         record_pdf(api=api, record=record, state='finished', version=version)
         finish_build(version=version, build=build, results=results)
 
-    def setup_environment(version):
+    def setup_vcs():
+        """
+        Update the checkout of the repo to make sure it's the latest.
+        This also syncs versions in the DB.
+        """
+
+        log.info(LOG_TEMPLATE.format(project=self.version.project.slug,
+                                     version=self.version.slug,
+                                     msg='Updating docs from VCS'))
+        try:
+            # XXX need to parse this output?
+            self.update_imported_docs()
+            commit = self.version.project.vcs_repo(self.version.slug).commit
+            if commit:
+                self.update(commit=commit)
+        except ProjectImportError, err:
+            log.error(LOG_TEMPLATE.format(project=self.version.project.slug,
+                                          version=self.version.slug,
+                                          msg='Failed to import project; skipping build'),
+                      exc_info=True)
+            self.update(state='finished')
+            # XXX should be reflected with a command
+            #self.build['setup_error'] = (
+            #    'Failed to import project; skipping build.\n'
+            #    '\nError\n-----\n\n%s' % err.message
+            #)
+            return False
+        return True
+
+    def update_imported_docs():
+        """
+        Check out or update the given project's repository.
+        """
+        version_data = self.api.version(self.version_pk).get()
+        version = make_api_version(version_data)
+        project = self.version.project
+
+        # Make Dirs
+        if not os.path.exists(project.doc_path):
+            os.makedirs(project.doc_path)
+
+        with project.repo_nonblockinglock(version=version,
+                                               max_lock_age=getattr(settings, 'REPO_LOCK_SECONDS', 30)):
+            if not project.vcs_repo():
+                raise ProjectImportError(("Repo type '{0}' unknown"
+                                         .format(project.repo_type)))
+
+            # Get the actual code on disk
+            if version:
+                log.info(
+                    LOG_TEMPLATE.format(
+                        project=project.slug,
+                        version=self.version.slug,
+                        msg='Checking out version {slug}: {identifier}'.format(
+                            slug=self.version.slug,
+                            identifier=self.version.identifier
+                        )
+                    )
+                )
+                version_slug = self.version.slug
+                version_repo = project.vcs_repo(version_slug)
+                # XXX make this not store to an array
+                for cmd in version_repo.checkout(self.version.identifier):
+                    self.record_cmd(cmd)
+            else:
+                # Does this ever get called?
+                log.info(LOG_TEMPLATE.format(
+                    project=project.slug, version=self.version.slug,
+                    msg='Updating to latest revision'))
+                version_slug = 'latest'
+                version_repo = project.vcs_repo(version_slug)
+                # XXX make this not store to an array
+                for cmd in version_repo.update():
+                    self.record_cmd(cmd)
+
+            # Update tags/version
+            version_post_data = {'repo': version_repo.repo_url}
+
+            if version_repo.supports_tags:
+                version_post_data['tags'] = [
+                    {'identifier': v.identifier,
+                    'verbose_name': v.verbose_name,
+                    } for v in version_repo.tags
+                ]
+
+            if version_repo.supports_branches:
+                version_post_data['branches'] = [
+                    {'identifier': v.identifier,
+                    'verbose_name': v.verbose_name,
+                    } for v in version_repo.branches
+                ]
+
+            try:
+                apiv2.project(project.pk).sync_versions.post(version_post_data)
+            except Exception, e:
+                print "Sync Versions Exception: %s" % e.message
+        return True
+
+    def setup_environment():
         """
         Build the virtualenv and install the project into it.
         """
-        cmds = []
-        project = version.project
+        project = self.version.project
         if project.use_virtualenv:
             build_dir = os.path.join(
-                project.venv_path(version=version.slug), 'build')
+                project.venv_path(version=self.version.slug), 'build')
             if os.path.exists(build_dir):
                 log.info(LOG_TEMPLATE.format(
-                    project=project.slug, version=version.slug, msg='Removing existing build dir'))
+                    project=project.slug, version=self.version.slug,
+                    msg='Removing existing build dir'))
                 shutil.rmtree(build_dir)
             if project.use_system_packages:
                 site_packages = '--system-site-packages'
@@ -114,14 +229,14 @@ class BuildSteps(object):
                 site_packages = '--no-site-packages'
             # Here the command has been modified to support different
             # interpreters.
-            cmds.append(ShellCommand.from_command(
+            self.run(
                 '{cmd} {site_packages} {path}'.format(
                     cmd='virtualenv-2.7 -p {interpreter}'.format(
                         interpreter=project.python_interpreter),
                     site_packages=site_packages,
-                    path=project.venv_path(version=version.slug)
+                    path=project.venv_path(version=self.version.slug)
                 )
-            ))
+            )
             # Other code expects sphinx-build to be installed inside the
             # virtualenv.  Using the -I option makes sure it gets installed
             # even if it is already installed system-wide (and
@@ -132,63 +247,67 @@ class BuildSteps(object):
                 ignore_option = ''
             sphinx = 'sphinx==1.2.2'
             if project.python_interpreter != 'python3':
-                cmds.append(ShellCommand.from_command(
+                self.run(
                     ('{cmd} install -U {ignore_option} {sphinx} '
-                    'virtualenv==1.10.1 setuptools==1.1 '
-                    'docutils==0.11 git+git://github.com/ericholscher/readthedocs-sphinx-ext#egg=readthedocs_ext').format(
-                        cmd=project.venv_bin(version=version.slug, bin='pip'),
-                        sphinx=sphinx, ignore_option=ignore_option)))
+                     'virtualenv==1.10.1 setuptools==1.1 '
+                     'docutils==0.11 git+git://github.com/ericholscher/readthedocs-sphinx-ext#egg=readthedocs_ext'
+                     .format(
+                         cmd=project.venv_bin(version=self.version.slug,
+                                              bin='pip'),
+                         sphinx=sphinx, ignore_option=ignore_option)))
             else:
                 # python 3 specific hax
-                cmds.append(ShellCommand.from_command(
+                self.run(
                     ('{cmd} install -U {ignore_option} {sphinx} '
-                    'virtualenv==1.9.1 docutils==0.11 git+git://github.com/ericholscher/readthedocs-sphinx-ext#egg=readthedocs_ext').format(
-                        cmd=project.venv_bin(version=version.slug, bin='pip'),
-                        sphinx=sphinx, ignore_option=ignore_option)))
+                     'virtualenv==1.9.1 docutils==0.11 git+git://github.com/ericholscher/readthedocs-sphinx-ext#egg=readthedocs_ext'
+                     .format(
+                         cmd=project.venv_bin(version=self.version.slug,
+                                              bin='pip'),
+                         sphinx=sphinx, ignore_option=ignore_option)))
 
             if project.requirements_file:
-                os.chdir(project.checkout_path(version.slug))
-                cmds.append(ShellCommand.from_command(
+                os.chdir(project.checkout_path(self.version.slug))
+                self.run(
                     '{cmd} install --exists-action=w -r {requirements}'.format(
-                        cmd=project.venv_bin(version=version.slug, bin='pip'),
-                        requirements=project.requirements_file)))
-            os.chdir(project.checkout_path(version.slug))
+                        cmd=project.venv_bin(version=self.version.slug, bin='pip'),
+                        requirements=project.requirements_file))
+            os.chdir(project.checkout_path(self.version.slug))
             if os.path.isfile("setup.py"):
                 if getattr(settings, 'USE_PIP_INSTALL', False):
-                    cmds.append(ShellCommand.from_command(
+                    self.run(
                         '{cmd} install --ignore-installed .'.format(
-                            cmd=project.venv_bin(version=version.slug, bin='pip'))))
+                            cmd=project.venv_bin(version=self.version.slug,
+                                                 bin='pip')))
                 else:
-                    cmds.append(ShellCommand.from_command(
+                    self.run(
                         '{cmd} setup.py install --force'.format(
-                            cmd=project.venv_bin(version=version.slug,
-                                                bin='python'))))
+                            cmd=project.venv_bin(version=self.version.slug,
+                                                 bin='python')))
             else:
                 pass
                 # XXX handle this with exception
                 #ret_dict['install'] = (999, "", "No setup.py, skipping install")
-        return cmds
+        return True
 
-
-    @task()
-    def build_docs(version, force, pdf, man, epub, dash, search, localmedia):
+    # XXX todo make this a task lower
+    #@task()
+    def build_docs(force, pdf, man, epub, dash, search, localmedia):
         """
         This handles the actual building of the documentation
         """
 
-        project = version.project
-        results = {}
+        project = self.version.project
 
         if 'sphinx' in project.documentation_type:
             try:
-                project.conf_file(version.slug)
+                project.conf_file(self.version.slug)
             except ProjectImportError:
                 results['html'] = (999, 'Conf file not found.', '')
                 return results
 
-        with project.repo_nonblockinglock(version=version,
+        with project.repo_nonblockinglock(version=self.version,
                                         max_lock_age=getattr(settings, 'REPO_LOCK_SECONDS', 30)):
-            html_builder = builder_loading.get(project.documentation_type)(version)
+            html_builder = builder_loading.get(project.documentation_type)(self.version)
             if force:
                 html_builder.force()
             # html_builder.clean()
@@ -206,30 +325,30 @@ class BuildSteps(object):
                 if search:
                     try:
                         search_builder = builder_loading.get(
-                            'sphinx_search')(version)
+                            'sphinx_search')(self.version)
                         results['search'] = search_builder.build()
                         if results['search'][0] == 0:
                             # Copy json for safe keeping
                             search_builder.move()
                     except:
                         log.error(LOG_TEMPLATE.format(
-                            project=project.slug, version=version.slug, msg="JSON Build Error"), exc_info=True)
+                            project=project.slug, version=self.version.slug, msg="JSON Build Error"), exc_info=True)
                 # Local media builder for singlepage HTML download archive
                 if localmedia:
                     try:
                         localmedia_builder = builder_loading.get(
-                            'sphinx_singlehtmllocalmedia')(version)
+                            'sphinx_singlehtmllocalmedia')(self.version)
                         results['localmedia'] = localmedia_builder.build()
                         if results['localmedia'][0] == 0:
                             localmedia_builder.move()
                     except:
                         log.error(LOG_TEMPLATE.format(
-                            project=project.slug, version=version.slug, msg="Local Media HTML Build Error"), exc_info=True)
+                            project=project.slug, version=self.version.slug, msg="Local Media HTML Build Error"), exc_info=True)
 
                 # Optional build steps
-                if version.project.slug not in HTML_ONLY and not project.skip:
+                if self.version.project.slug not in HTML_ONLY and not project.skip:
                     if pdf:
-                        pdf_builder = builder_loading.get('sphinx_pdf')(version)
+                        pdf_builder = builder_loading.get('sphinx_pdf')(self.version)
                         results['pdf'] = pdf_builder.build()
                         # Always move pdf results even when there's an error.
                         # if pdf_results[0] == 0:
@@ -237,7 +356,7 @@ class BuildSteps(object):
                     else:
                         results['pdf'] = fake_results
                     if epub:
-                        epub_builder = builder_loading.get('sphinx_epub')(version)
+                        epub_builder = builder_loading.get('sphinx_epub')(self.version)
                         results['epub'] = epub_builder.build()
                         if results['epub'][0] == 0:
                             epub_builder.move()
@@ -255,28 +374,28 @@ class BuildSteps(object):
 
         if 'no targets are out of date.' in out:
             log.info(LOG_TEMPLATE.format(
-                project=version.project.slug, version=version.slug, msg="Build Unchanged"))
+                project=self.version.project.slug, version=self.version.slug, msg="Build Unchanged"))
         else:
             if ret == 0:
                 log.info(LOG_TEMPLATE.format(
-                    project=version.project.slug, version=version.slug, msg="Successful Build"))
-                fileify.delay(version.pk)
-                symlinks.symlink_cnames(version)
-                symlinks.symlink_translations(version)
-                symlinks.symlink_subprojects(version)
+                    project=self.version.project.slug, version=self.version.slug, msg="Successful Build"))
+                fileify.delay(self.version.pk)
+                symlinks.symlink_cnames(self.version)
+                symlinks.symlink_translations(self.version)
+                symlinks.symlink_subprojects(self.version)
 
                 if version.project.single_version:
-                    symlinks.symlink_single_version(version)
+                    symlinks.symlink_single_version(self.version)
                 else:
-                    symlinks.remove_symlink_single_version(version)
+                    symlinks.remove_symlink_single_version(self.version)
 
                 try:
-                    update_search(version)
+                    update_search(self.version)
                 except Exception:
                     log.error("Unable to index search", exc_info=True)
 
                 try:
-                    update_static_metadata(version.project.pk)
+                    update_static_metadata(self.version.project.pk)
                 except Exception:
                     log.error("Unable to post a new build", exc_info=True)
 
@@ -284,7 +403,7 @@ class BuildSteps(object):
                 #send_notifications(version, build)
             else:
                 log.warning(LOG_TEMPLATE.format(
-                    project=version.project.slug, version=version.slug, msg="Failed HTML Build"))
+                    project=self.version.project.slug, version=self.version.slug, msg="Failed HTML Build"))
 
     def ensure_version(api, project, version_pk):
         """
@@ -293,12 +412,12 @@ class BuildSteps(object):
         """
 
         if version_pk:
-            version_data = api.version(version_pk).get()
+            version_data = self.api.version(version_pk).get()
         else:
             branch = project.default_branch or project.vcs_repo().fallback_branch
             try:
                 # Use latest version
-                version_data = (api.version(project.slug)
+                version_data = (self.api.version(project.slug)
                                 .get(slug='latest')['objects'][0])
             except (slumber.exceptions.HttpClientError, IndexError):
                 # Create the latest version since it doesn't exist
@@ -311,7 +430,7 @@ class BuildSteps(object):
                     identifier=branch,
                 )
                 try:
-                    version_data = api.version.post(version_data)
+                    version_data = self.api.version.post(version_data)
                 except Exception as e:
                     log.info(LOG_TEMPLATE.format(
                         project=project.slug, version='', msg='Exception in creating version: %s' % e))
@@ -338,31 +457,6 @@ class BuildSteps(object):
 
         return version
 
-
-    def setup_vcs(version, build, api):
-        """
-        Update the checkout of the repo to make sure it's the latest.
-        This also syncs versions in the DB.
-        """
-
-        log.info(LOG_TEMPLATE.format(project=version.project.slug,
-                                    version=version.slug, msg='Updating docs from VCS'))
-        try:
-            update_output = update_imported_docs(version.pk, api)
-            commit = version.project.vcs_repo(version.slug).commit
-            if commit:
-                build['commit'] = commit
-        except ProjectImportError, err:
-            log.error(LOG_TEMPLATE.format(project=version.project.slug, version=version.slug,
-                                        msg='Failed to import project; skipping build'), exc_info=True)
-            build['state'] = 'finished'
-            build['setup_error'] = (
-                'Failed to import project; skipping build.\n'
-                '\nError\n-----\n\n%s' % err.message
-            )
-            api.build(build['id']).put(build)
-            return False
-        return update_output
 
     def record_pdf(api, record, state, version, results=None):
         if not record:
@@ -432,17 +526,19 @@ class BuildSteps(object):
                     to_path = version.project.get_production_media_path(type='epub', version_slug=version.slug, include_file=False)
                     core_utils.copy(from_path, to_path)
 
-    def update(self, state):
+    def update(self, **kwargs):
         """
-        Record a build by hitting the API.
+        Update build in API
 
-        Returns build id
+        kwargs
+            Update local build dictionary with these arguments, then update the
+            object via API
         """
         if not self.record:
             return None
 
-        self.build['state'] = state
-        # TODO fix this
+        self.build.update(kwargs)
+        # TODO fix this, or show it with commands
         #if 'html' in results:
         #    build['success'] = results['html'][0] == 0
         #else:
@@ -453,7 +549,6 @@ class BuildSteps(object):
         except Exception, e:
             log.error("Unable to post a new build", exc_info=True)
         return ret
-
 
 
 class DockerBuildSteps(BuildSteps):
