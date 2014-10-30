@@ -10,55 +10,65 @@
 {% block extra_scripts %}
   <script type="text/javascript">
 
-    var outcome = function(field_from_url, field_to_url, option) {       
-      var result="";       
-      if (option === "Prefix Redirect") { 
-        result = "Outcome:" + field_from_url.val() + "faq.html -> /$lang/$version/faq.html" 
-      } else { 
-        result = "Outcome: /$lang/$version/" + field_from_url.val() + " -> /$lang/$version/" + field_to_url.val()
-      }      
-      return result;  
-    }; 
+    var update_outcome = function(ev) {
+      var field_from_url = $('#id_from_url');
+          field_to_url =  $('#id_to_url');
+          option = $('#id_redirect_type').val();
+          redirect_from = '',
+          redirect_target = '';
+
+      if (option === "prefix") {
+        redirect_from = field_from_url.val() + "faq.html";
+        redirect_target = "/$lang/$version/faq.html";
+      }
+      else if (option === "page" ) {
+        redirect_from = "/$lang/$version/" + field_from_url.val();
+        redirect_target = "/$lang/$version/" + field_to_url.val();
+      }
+
+      if (redirect_from && redirect_target) {
+        var result = "Outcome: " + redirect_from + " -> " + redirect_target;
+        $('#dynamic-redirect').text(result).show();
+      }
+      else {
+        $('#dynamic-redirect').text("").hide();
+      }
+    };
 
     $(document).ready(function() {
       $('#id_from_url').parent().hide()
       $('#id_to_url').parent().hide()
       $('#dynamic-redirect').hide()
-    
-      $('#id_redirect_type').on('change', function() {
+
+      $('#id_redirect_type').bind('change click', function(ev) {
+        $('#id_from_url').val('');
+        $('#id_to_url').val('');
         if (this.value == 'prefix') {
             $('#id_from_url').parent().show()
             $('#id_to_url').parent().hide()
         }
-        if (this.value == 'page') {
+        else if (this.value == 'page') {
             $('#id_from_url').parent().show()
             $('#id_to_url').parent().show()
         }
-        if (this.value == 'sphinx_html' || this.value == 'sphinx_htmldir') {
+        else if (this.value == 'sphinx_html' || this.value == 'sphinx_htmldir') {
             $('#id_from_url').parent().hide()
             $('#id_to_url').parent().hide()
-            $('#dynamic-redirect').hide()
         }
-        if (this.value == 'advanced') {
+        else if (this.value == 'advanced') {
             $('#id_from_url').parent().show()
             $('#id_to_url').parent().show()
-            $('#dynamic-redirect').hide()
         }
-      }); 
+        else {
+            $('#id_from_url').parent().hide()
+            $('#id_to_url').parent().hide()
+        }
+
+        update_outcome(ev);
+      });
+
+      $('#id_from_url, #id_to_url').keyup(update_outcome);
     });
-
-    $(document).ready(function() {
-      $('#id_redirect_type').change(function() {
-        var field_from_url = $('#id_from_url').val(""); 
-        var field_to_url =  $('#id_to_url').val("");
-        var option = $('#id_redirect_type option:selected').text() 
-        $('#dynamic-redirect').hide()
-
-        $('#id_from_url, #id_to_url').keyup(function(event) {
-          $('#dynamic-redirect').show().text(outcome(field_from_url, field_to_url, option)); 
-        }); 
-      }); 
-    }); 
 
   </script>
 {% endblock %}
