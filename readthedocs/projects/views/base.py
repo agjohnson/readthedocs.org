@@ -1,4 +1,24 @@
+from django.shortcuts import get_object_or_404
+
 from projects.models import Project
+
+
+class ProjectViewMixin(object):
+    '''Lookup project based on kwarg slug lookup
+
+    View expects the following kwargs:
+
+    project_slug
+        Project slug for lookup
+    '''
+
+    project_slug_url_kwarg = 'project_slug'
+
+    def get_project(self):
+        return get_object_or_404(
+            Project.objects.for_admin_user(self.request.user),
+            slug=self.kwargs[self.project_slug_url_kwarg]
+        )
 
 
 class ProjectOnboardMixin(object):

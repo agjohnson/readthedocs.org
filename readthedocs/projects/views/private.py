@@ -10,7 +10,7 @@ from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotAllow
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template import RequestContext
-from django.views.generic import View, ListView, TemplateView
+from django.views.generic import View, DetailView, ListView, TemplateView
 from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.formtools.wizard.views import SessionWizardView
@@ -26,9 +26,10 @@ from oauth.models import GithubProject, BitbucketProject
 from oauth import utils as oauth_utils
 from projects.forms import (ProjectBackendForm, ProjectBasicsForm,
                             ProjectExtraForm, ProjectAdvancedForm,
-                            UpdateProjectForm, SubprojectForm,
-                            build_versions_form, UserForm, EmailHookForm,
-                            TranslationForm, RedirectForm, WebHookForm)
+                            UpdateProjectForm, SubprojectForm, UserForm,
+                            EmailHookForm, TranslationForm, RedirectForm,
+                            WebHookForm)
+from projects.views.base import ProjectViewMixin
 from projects.models import Project, EmailHook, WebHook
 from projects import constants
 
@@ -137,33 +138,21 @@ def project_advanced(request, project_slug):
     )
 
 
-@login_required
-def project_versions(request, project_slug):
-    """
-    Shows the available versions and lets the user choose which ones he would
-    like to have built.
-    """
-    project = get_object_or_404(Project.objects.for_admin_user(request.user),
-                                slug=project_slug)
+class ProjectVersionsView(ListView, ProjectViewMixin):
+    '''
+    List view for project versions
+    '''
 
-    if not project.is_imported:
-        raise Http404
+    model = Version
+    template_name = 'projects/project_versions.html'
 
-    form_class = build_versions_form(project)
+    def get_queryset(self):
+        return self.get_project().versions
 
-    form = form_class(data=request.POST or None)
-
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(request, _('Project versions updated'))
-        project_dashboard = reverse('projects_detail', args=[project.slug])
-        return HttpResponseRedirect(project_dashboard)
-
-    return render_to_response(
-        'projects/project_versions.html',
-        {'form': form, 'project': project},
-        context_instance=RequestContext(request)
-    )
+    def get_context_data(self, **kwargs):
+        ctx = super(ProjectVersionsView, self).get_context_data(**kwargs)
+        ctx['project'] = self.get_project()
+        return ctx
 
 
 @login_required
