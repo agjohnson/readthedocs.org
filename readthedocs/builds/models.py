@@ -6,6 +6,8 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import ugettext_lazy as _, ugettext
 
+from actstream import registry
+
 from guardian.shortcuts import assign
 from taggit.managers import TaggableManager
 
@@ -285,3 +287,7 @@ class Build(models.Model):
     def finished(self):
         '''Return if build has a finished state'''
         return self.state == 'finished'
+
+
+registry.register(Build)
+registry.register(Version)

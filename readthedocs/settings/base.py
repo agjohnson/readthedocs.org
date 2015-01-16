@@ -182,8 +182,6 @@ INSTALLED_APPS = [
     'haystack',
     'tastypie',
 
-
-
     # our apps
     'bookmarks',
     'projects',
@@ -203,6 +201,9 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.github',
     'allauth.socialaccount.providers.bitbucket',
     #'allauth.socialaccount.providers.twitter',
+
+    # Note: Activity stream must be the last application loaded if Django < 1.7
+    'actstream'
 ]
 
 SOUTH_MIGRATION_MODULES = {

@@ -3,6 +3,8 @@
 {% load privacy_tags %}
 {% load gravatar %}
 {% load projects_tags %}
+{% load activity_tags %}
+
 
 <div id="project_details">
   <div class="wrapper">
@@ -81,6 +83,23 @@
         <input type="submit" value="{% trans "Build" %}">
       </form>
     </div>
+  </div>
+
+  <div class="module module-activity">
+    <h3>Activity</h3>
+    <ul>
+      {% activity_stream 'target' project %}
+      {% for action in stream %}
+        <li class="activity activity-{{ action.actor|verbose_name|slugify }} activity-{{ action.actor|verbose_name|slugify }}-{{ action.verb|slugify }}">
+          <div class="activity-timestamp">{{ action.timestamp|timesince }} {% trans "ago" %}</div>
+          <div class="activity-action">
+            <a href="{{ action.actor.get_absolute_url }}">{{ action.actor|verbose_name|title }} {{ action.verb }}</a>
+          </div>
+        </li>
+      {% empty %}
+        <li>No activity yet.</li>
+      {% endfor %}
+    </ul>
   </div>
 {% endif %}
 

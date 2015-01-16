@@ -3,6 +3,7 @@ import hashlib
 
 from django import template
 from django.conf import settings
+from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.encoding import force_bytes, force_text
 
@@ -95,3 +96,8 @@ def url_replace(request, field, value):
     dict_[field] = value
     return dict_.urlencode()
 
+
+@register.filter
+def verbose_name(obj):
+    if isinstance(obj, models.Model):
+        return obj._meta.verbose_name

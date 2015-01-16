@@ -13,6 +13,8 @@ from django.utils.translation import ugettext_lazy as _
 
 from guardian.shortcuts import assign
 
+from actstream import registry
+
 from betterversion.better import version_windows, BetterVersion
 from oauth import utils as oauth_utils
 from privacy.loader import RelatedProjectManager, ProjectManager
@@ -798,3 +800,6 @@ class WebHook(Notification):
 
     def __unicode__(self):
         return self.url
+
+
+registry.register(Project)
