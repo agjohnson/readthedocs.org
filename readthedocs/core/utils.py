@@ -71,19 +71,42 @@ def cname_to_slug(host):
     return slug
 
 
-def trigger_build(project, version=None, record=True, force=False, basic=False):
+def trigger_build(project, version=None, record=True, force=False, basic=False,
+                  queue=None):
     """
     An API to wrap the triggering of a build.
+
+    :param project: Project to build
+    :type project: readthedocs.projects.models.Project
+    :param version: Project version to build
+    :type version: readthedocs.builds.models.Version
+    :param record: Record build
+    :type record: bool
+    :param force: Pass on force build to task
+    :type force: bool
+    :param basic: TODO
+    :param queue: Celery queue name to user for triggering build, defaults to
+                  the default Cerlery queue in settings
+    :returns: Project build instance or None
+    :rtype: readthedocs.builds.models.Build
     """
     # Avoid circular import
     from projects.tasks import update_docs
 
     if project.skip:
         return None
-
     if not version:
         version = project.versions.get(slug='latest')
 
+    build = None
+    opts = {}
+    kwargs = dict(
+        pk=project.pk,
+        version_pk=version.pk,
+        record=record,
+        force=force,
+        basic=basic)
+    )
     if record:
         build = Build.objects.create(
             project=project,
@@ -92,10 +115,11 @@ def trigger_build(project, version=None, record=True, force=False, basic=False):
             state='triggered',
             success=True,
         )
-        update_docs.delay(pk=project.pk, version_pk=version.pk, record=record, force=force, basic=basic, build_pk=build.pk)
-    else:
-        build = None
-        update_docs.delay(pk=project.pk, version_pk=version.pk, record=record, force=force, basic=basic)
+        kwargs['build_pk'] = build.pk
+    # Task options
+    if queue is not None:
+        opts['queue'] = queue
+    update_docs.apply_async(kwargs=kwargs, **opts)
 
     return build
 
